@@ -1,7 +1,8 @@
+using EmployeeService.Domain.Enums;
 using EmployeeService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace EmployeeService.Data;
+namespace EmployeeService.Infrastructure.Data;
 
 public class EmployeeDbContext : DbContext
 {

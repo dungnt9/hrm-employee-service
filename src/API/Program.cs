@@ -1,5 +1,8 @@
-using EmployeeService.Data;
+using EmployeeService.Application.Common.Abstractions.Repositories;
+using EmployeeService.Application.MappingProfiles;
 using EmployeeService.GrpcServices;
+using EmployeeService.Infrastructure.Data;
+using EmployeeService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -14,14 +17,25 @@ Log.Logger = new LoggerConfiguration()
 
 builder.Host.UseSerilog();
 
-// Add services
+// Add DbContext
 builder.Services.AddDbContext<EmployeeDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Add gRPC
 builder.Services.AddGrpc();
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
-// Health checks
+// Add MediatR - scan Application assembly for handlers
+builder.Services.AddMediatR(cfg =>
+    cfg.RegisterServicesFromAssembly(typeof(EmployeeMappingProfile).Assembly));
+
+// Add AutoMapper
+builder.Services.AddAutoMapper(typeof(EmployeeMappingProfile));
+
+// Add Repository pattern
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+
+// Add Health checks
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("DefaultConnection")!, name: "postgresql");
 
@@ -31,11 +45,16 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<EmployeeDbContext>();
-    db.Database.EnsureCreated();
+    await db.Database.EnsureCreatedAsync();
 }
 
+// Map gRPC service
 app.MapGrpcService<EmployeeGrpcServiceImpl>();
-app.MapGet("/", () => "Employee Service is running");
+
+// Health check endpoint
 app.MapHealthChecks("/health");
+
+// Simple health check endpoint
+app.MapGet("/", () => "Employee Service is running");
 
 app.Run();
