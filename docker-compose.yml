@@ -1,0 +1,49 @@
+# =====================================================
+# Employee Service - Docker Compose
+# =====================================================
+#
+# Yêu cầu: Infrastructure phải đang chạy (hrm-deployment/docker-compose.infra.yml)
+#
+# Chạy service:
+#   docker compose up -d --build
+#
+# Xem logs:
+#   docker compose logs -f
+#
+# Dừng service:
+#   docker compose down
+#
+# =====================================================
+
+services:
+  employee-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hrm-employee-service
+    restart: unless-stopped
+    env_file:
+      - ../hrm-deployment/.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: "http://+:8080;http://+:8081"
+      ConnectionStrings__DefaultConnection: ${EMPLOYEE_DB_CONNECTION}
+      Keycloak__Authority: ${KEYCLOAK_AUTHORITY}
+      Keycloak__Audience: hrm-api
+      Keycloak__ClientId: ${KEYCLOAK_CLIENT_ID}
+      Keycloak__ClientSecret: ${KEYCLOAK_CLIENT_SECRET}
+      Keycloak__RequireHttps: "false"
+    ports:
+      - "${EMPLOYEE_SERVICE_HTTP_PORT:-5001}:8080"
+      - "${EMPLOYEE_SERVICE_GRPC_PORT:-5002}:8081"
+    networks:
+      - hrm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  hrm-network:
+    external: true
