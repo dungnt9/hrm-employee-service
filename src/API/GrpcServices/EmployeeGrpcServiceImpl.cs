@@ -140,6 +140,80 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
         }
     }
 
+    public override async Task<DepartmentsResponse> GetDepartments(GetDepartmentsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var query = new GetAllDepartmentsQuery();
+
+            if (!string.IsNullOrEmpty(request.CompanyId) && Guid.TryParse(request.CompanyId, out var companyId))
+            {
+                query.CompanyId = companyId;
+            }
+
+            var departments = await _mediator.Send(query);
+
+            var response = new DepartmentsResponse();
+
+            foreach (var dept in departments)
+            {
+                response.Departments.Add(new Protos.Department
+                {
+                    Id = dept.Id.ToString(),
+                    Name = dept.Name,
+                    CompanyId = dept.CompanyId.ToString(),
+                    ManagerId = dept.ManagerId?.ToString() ?? string.Empty,
+                    ManagerName = dept.ManagerName ?? string.Empty,
+                    CreatedAt = dept.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting departments");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving departments."));
+        }
+    }
+
+    public override async Task<TeamsResponse> GetTeams(GetTeamsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var query = new GetAllTeamsQuery();
+
+            if (!string.IsNullOrEmpty(request.DepartmentId) && Guid.TryParse(request.DepartmentId, out var departmentId))
+            {
+                query.DepartmentId = departmentId;
+            }
+
+            var teams = await _mediator.Send(query);
+
+            var response = new TeamsResponse();
+
+            foreach (var team in teams)
+            {
+                response.Teams.Add(new Protos.Team
+                {
+                    Id = team.Id.ToString(),
+                    Name = team.Name,
+                    DepartmentId = team.DepartmentId.ToString(),
+                    ManagerId = team.LeaderId?.ToString() ?? string.Empty,
+                    ManagerName = team.LeaderName ?? string.Empty,
+                    CreatedAt = team.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                });
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting teams");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving teams."));
+        }
+    }
+
     private EmployeeResponse MapToResponse(EmployeeDto employee)
     {
         return new EmployeeResponse
