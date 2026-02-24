@@ -56,7 +56,7 @@ VALUES
 ('44444444-4444-4444-4444-444444444440', 'EMP001', 'Minh', 'Nguyen', 'ceo@techcorp.vn', '+84901234560', '1975-03-15', 0, '456 Le Loi, District 1, HCMC', '22222222-2222-2222-2222-222222222221', NULL, 'CEO', 'Chief Executive Officer', NULL, 'ceo-user-id', '2015-01-01', 0, 0, 100000000, '0123456789', 'Vietcombank', NOW(), NOW()),
 
 -- System Admin
-('44444444-4444-4444-4444-444444444444', 'EMP002', 'Admin', 'System', 'admin@techcorp.vn', '+84901234561', '1985-06-20', 0, '789 Tran Hung Dao, District 5, HCMC', '22222222-2222-2222-2222-222222222226', '33333333-3333-3333-3333-33333333333b', 'System Administrator', 'Senior System Administrator', '44444444-4444-4444-4444-444444444440', 'admin', '2018-03-15', 0, 0, 35000000, '0123456790', 'Vietcombank', NOW(), NOW()),
+('44444444-4444-4444-4444-444444444444', 'EMP002', 'Admin', 'System', 'admin@techcorp.vn', '+84901234561', '1985-06-20', 0, '789 Tran Hung Dao, District 5, HCMC', '22222222-2222-2222-2222-222222222226', '33333333-3333-3333-3333-33333333333b', 'System Administrator', 'Senior System Administrator', '44444444-4444-4444-4444-444444444440', '28487331-2262-40a9-9846-31c26d4ae2de', '2018-03-15', 0, 0, 35000000, '0123456790', 'Vietcombank', NOW(), NOW()),
 
 -- HR Department
 ('44444444-4444-4444-4444-444444444445', 'EMP003', 'Lan', 'Pham', 'hr_manager@techcorp.vn', '+84901234562', '1982-08-10', 1, '321 Vo Van Tan, District 3, HCMC', '22222222-2222-2222-2222-222222222223', NULL, 'HR Manager', 'Human Resources Manager', '44444444-4444-4444-4444-444444444440', 'hr_user', '2017-06-01', 0, 0, 45000000, '0123456791', 'Techcombank', NOW(), NOW()),

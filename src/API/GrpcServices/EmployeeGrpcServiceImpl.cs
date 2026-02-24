@@ -1,4 +1,5 @@
 using AutoMapper;
+using EmployeeService.Application.Common.Abstractions.Repositories;
 using EmployeeService.Application.Features.Employees.Commands;
 using EmployeeService.Application.Features.Employees.DTOs;
 using EmployeeService.Application.Features.Employees.Queries;
@@ -14,12 +15,14 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
     private readonly ILogger<EmployeeGrpcServiceImpl> _logger;
+    private readonly IEmployeeRepository _employeeRepository;
 
-    public EmployeeGrpcServiceImpl(IMediator mediator, IMapper mapper, ILogger<EmployeeGrpcServiceImpl> logger)
+    public EmployeeGrpcServiceImpl(IMediator mediator, IMapper mapper, ILogger<EmployeeGrpcServiceImpl> logger, IEmployeeRepository employeeRepository)
     {
         _mediator = mediator;
         _mapper = mapper;
         _logger = logger;
+        _employeeRepository = employeeRepository;
     }
 
     public override async Task<EmployeeResponse> GetEmployee(GetEmployeeRequest request, ServerCallContext context)
@@ -140,6 +143,55 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
         }
     }
 
+    public override async Task<EmployeeResponse> UpdateEmployee(UpdateEmployeeRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+            {
+                _logger.LogWarning("Invalid employee ID format: {EmployeeId}", request.EmployeeId);
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID format."));
+            }
+
+            var command = new UpdateEmployeeCommand
+            {
+                Id = employeeId,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                Phone = string.IsNullOrEmpty(request.Phone) ? null : request.Phone,
+                DepartmentId = Guid.TryParse(request.DepartmentId, out var deptId) ? deptId : null,
+                TeamId = Guid.TryParse(request.TeamId, out var teamId) ? teamId : null,
+                Position = string.IsNullOrEmpty(request.Position) ? null : request.Position,
+                ManagerId = Guid.TryParse(request.ManagerId, out var managerId) ? managerId : null,
+                Status = string.IsNullOrEmpty(request.Status) ? "Active" : request.Status,
+            };
+
+            var success = await _mediator.Send(command);
+            if (!success)
+            {
+                _logger.LogInformation("Employee not found for update: {EmployeeId}", employeeId);
+                return new EmployeeResponse();
+            }
+
+            var getQuery = new GetEmployeeByIdQuery(employeeId);
+            var employee = await _mediator.Send(getQuery);
+            if (employee == null)
+                return new EmployeeResponse();
+
+            return MapToResponse(employee);
+        }
+        catch (RpcException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating employee {EmployeeId}", request.EmployeeId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while updating the employee."));
+        }
+    }
+
     public override async Task<DepartmentsResponse> GetDepartments(GetDepartmentsRequest request, ServerCallContext context)
     {
         try
@@ -211,6 +263,27 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
         {
             _logger.LogError(ex, "Error getting teams");
             throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving teams."));
+        }
+    }
+
+    public override async Task<EmployeeResponse> GetEmployeeByKeycloakId(GetEmployeeByKeycloakIdRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(request.KeycloakUserId))
+                return new EmployeeResponse();
+
+            var employee = await _employeeRepository.GetByKeycloakUserIdAsync(request.KeycloakUserId);
+            if (employee == null)
+                return new EmployeeResponse();
+
+            var dto = _mapper.Map<EmployeeDto>(employee);
+            return MapToResponse(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employee by Keycloak ID {KeycloakUserId}", request.KeycloakUserId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the employee."));
         }
     }
 
