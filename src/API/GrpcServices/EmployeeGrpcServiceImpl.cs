@@ -82,6 +82,13 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
                     e.Email.ToLower().Contains(search)).ToList();
             }
 
+            if (!string.IsNullOrEmpty(request.Status))
+            {
+                var statusFilter = request.Status.ToLower();
+                employeeList = employeeList.Where(e =>
+                    !string.IsNullOrEmpty(e.Status) && e.Status.ToLower() == statusFilter).ToList();
+            }
+
             var totalCount = employeeList.Count;
             var page = request.Page > 0 ? request.Page : 1;
             var pageSize = request.PageSize > 0 ? request.PageSize : 10;
@@ -216,7 +223,8 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
                     CompanyId = dept.CompanyId.ToString(),
                     ManagerId = dept.ManagerId?.ToString() ?? string.Empty,
                     ManagerName = dept.ManagerName ?? string.Empty,
-                    CreatedAt = dept.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                    CreatedAt = dept.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Description = dept.Description ?? string.Empty
                 });
             }
 
@@ -253,7 +261,8 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
                     DepartmentId = team.DepartmentId.ToString(),
                     ManagerId = team.LeaderId?.ToString() ?? string.Empty,
                     ManagerName = team.LeaderName ?? string.Empty,
-                    CreatedAt = team.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                    CreatedAt = team.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Description = team.Description ?? string.Empty
                 });
             }
 
@@ -285,6 +294,224 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
             _logger.LogError(ex, "Error getting employee by Keycloak ID {KeycloakUserId}", request.KeycloakUserId);
             throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the employee."));
         }
+    }
+
+    public override async Task<Protos.Department> GetDepartment(GetDepartmentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.DepartmentId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid department ID."));
+
+            var dept = await _mediator.Send(new GetDepartmentByIdQuery(id));
+            if (dept == null)
+                throw new RpcException(new Status(StatusCode.NotFound, "Department not found."));
+
+            return MapDepartmentToProto(dept);
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting department {DepartmentId}", request.DepartmentId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the department."));
+        }
+    }
+
+    public override async Task<Protos.Department> CreateDepartment(CreateDepartmentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var command = new CreateDepartmentCommand
+            {
+                Name = request.Name,
+                Description = string.IsNullOrEmpty(request.Description) ? null : request.Description,
+                ManagerId = string.IsNullOrEmpty(request.ManagerId) ? null : request.ManagerId
+            };
+            var id = await _mediator.Send(command);
+            var dept = await _mediator.Send(new GetDepartmentByIdQuery(id));
+            return dept != null ? MapDepartmentToProto(dept) : new Protos.Department();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating department");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while creating the department."));
+        }
+    }
+
+    public override async Task<Protos.Department> UpdateDepartment(UpdateDepartmentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.DepartmentId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid department ID."));
+
+            var command = new UpdateDepartmentCommand
+            {
+                Id = id,
+                Name = request.Name,
+                Description = string.IsNullOrEmpty(request.Description) ? null : request.Description,
+                ManagerId = string.IsNullOrEmpty(request.ManagerId) ? null : request.ManagerId
+            };
+            var success = await _mediator.Send(command);
+            if (!success)
+                throw new RpcException(new Status(StatusCode.NotFound, "Department not found."));
+
+            var dept = await _mediator.Send(new GetDepartmentByIdQuery(id));
+            return dept != null ? MapDepartmentToProto(dept) : new Protos.Department();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating department {DepartmentId}", request.DepartmentId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while updating the department."));
+        }
+    }
+
+    public override async Task<DeleteDepartmentResponse> DeleteDepartment(DeleteDepartmentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.DepartmentId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid department ID."));
+
+            var command = new DeleteDepartmentCommand { Id = id };
+            var success = await _mediator.Send(command);
+            return new DeleteDepartmentResponse
+            {
+                Success = success,
+                Message = success ? "Department deleted." : "Department not found."
+            };
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting department {DepartmentId}", request.DepartmentId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while deleting the department."));
+        }
+    }
+
+    public override async Task<Protos.Team> GetTeam(GetTeamRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.TeamId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid team ID."));
+
+            var team = await _mediator.Send(new GetTeamByIdQuery(id));
+            if (team == null)
+                throw new RpcException(new Status(StatusCode.NotFound, "Team not found."));
+
+            return MapTeamToProto(team);
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting team {TeamId}", request.TeamId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the team."));
+        }
+    }
+
+    public override async Task<Protos.Team> CreateTeam(CreateTeamRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var command = new CreateTeamCommand
+            {
+                Name = request.Name,
+                Description = string.IsNullOrEmpty(request.Description) ? null : request.Description,
+                DepartmentId = Guid.TryParse(request.DepartmentId, out var deptId) ? deptId : Guid.Empty,
+                LeaderId = string.IsNullOrEmpty(request.LeaderId) ? null : request.LeaderId
+            };
+            var id = await _mediator.Send(command);
+            var team = await _mediator.Send(new GetTeamByIdQuery(id));
+            return team != null ? MapTeamToProto(team) : new Protos.Team();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating team");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while creating the team."));
+        }
+    }
+
+    public override async Task<Protos.Team> UpdateTeam(UpdateTeamRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.TeamId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid team ID."));
+
+            var command = new UpdateTeamCommand
+            {
+                Id = id,
+                Name = request.Name,
+                Description = string.IsNullOrEmpty(request.Description) ? null : request.Description,
+                DepartmentId = string.IsNullOrEmpty(request.DepartmentId) ? null : request.DepartmentId,
+                LeaderId = string.IsNullOrEmpty(request.LeaderId) ? null : request.LeaderId
+            };
+            var success = await _mediator.Send(command);
+            if (!success)
+                throw new RpcException(new Status(StatusCode.NotFound, "Team not found."));
+
+            var team = await _mediator.Send(new GetTeamByIdQuery(id));
+            return team != null ? MapTeamToProto(team) : new Protos.Team();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating team {TeamId}", request.TeamId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while updating the team."));
+        }
+    }
+
+    public override async Task<DeleteTeamResponse> DeleteTeam(DeleteTeamRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.TeamId, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid team ID."));
+
+            var command = new DeleteTeamCommand { Id = id };
+            var success = await _mediator.Send(command);
+            return new DeleteTeamResponse
+            {
+                Success = success,
+                Message = success ? "Team deleted." : "Team not found."
+            };
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting team {TeamId}", request.TeamId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while deleting the team."));
+        }
+    }
+
+    private Protos.Department MapDepartmentToProto(DepartmentDto dept)
+    {
+        return new Protos.Department
+        {
+            Id = dept.Id.ToString(),
+            Name = dept.Name,
+            CompanyId = dept.CompanyId.ToString(),
+            ManagerId = dept.ManagerId?.ToString() ?? string.Empty,
+            ManagerName = dept.ManagerName ?? string.Empty,
+            CreatedAt = dept.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            Description = dept.Description ?? string.Empty
+        };
+    }
+
+    private Protos.Team MapTeamToProto(TeamDto team)
+    {
+        return new Protos.Team
+        {
+            Id = team.Id.ToString(),
+            Name = team.Name,
+            DepartmentId = team.DepartmentId.ToString(),
+            ManagerId = team.LeaderId?.ToString() ?? string.Empty,
+            ManagerName = team.LeaderName ?? string.Empty,
+            CreatedAt = team.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            Description = team.Description ?? string.Empty
+        };
     }
 
     private EmployeeResponse MapToResponse(EmployeeDto employee)
