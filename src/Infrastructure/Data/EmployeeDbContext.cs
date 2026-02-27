@@ -17,6 +17,9 @@ public class EmployeeDbContext : DbContext
     public DbSet<EmployeeRole> EmployeeRoles => Set<EmployeeRole>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<EmployeeDocument> EmployeeDocuments => Set<EmployeeDocument>();
+    public DbSet<EmployeeContact> EmployeeContacts => Set<EmployeeContact>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,6 +120,51 @@ public class EmployeeDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CompanyId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeDocument
+        modelBuilder.Entity<EmployeeDocument>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DocumentType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DocumentName).IsRequired().HasMaxLength(300);
+            entity.Property(e => e.FilePath).IsRequired().HasMaxLength(500);
+            entity.HasOne(e => e.Employee)
+                .WithMany(emp => emp.Documents)
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeContact
+        modelBuilder.Entity<EmployeeContact>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ContactName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Relationship).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Phone).IsRequired().HasMaxLength(50);
+            entity.HasOne(e => e.Employee)
+                .WithMany(emp => emp.EmergencyContacts)
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Announcement
+        modelBuilder.Entity<Announcement>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.Content).IsRequired();
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.Category);
+            entity.HasOne(e => e.Department)
+                .WithMany()
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.CreatedByEmployee)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Seed data

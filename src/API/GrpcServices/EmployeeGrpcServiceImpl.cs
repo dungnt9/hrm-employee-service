@@ -486,6 +486,333 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
         }
     }
 
+    // ===== Documents =====
+
+    public override async Task<DocumentsResponse> GetDocuments(GetDocumentsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID."));
+
+            var docs = await _mediator.Send(new GetDocumentsByEmployeeQuery(employeeId));
+            var response = new DocumentsResponse();
+            response.Documents.AddRange(docs.Select(MapDocumentToProto));
+            return response;
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting documents for employee {EmployeeId}", request.EmployeeId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving documents."));
+        }
+    }
+
+    public override async Task<DocumentResponse> AddDocument(AddDocumentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID."));
+
+            var command = new AddDocumentCommand
+            {
+                EmployeeId = employeeId,
+                DocumentType = request.DocumentType,
+                DocumentName = request.DocumentName,
+                FilePath = request.FilePath,
+                Description = string.IsNullOrEmpty(request.Description) ? null : request.Description,
+                UploadedBy = Guid.TryParse(request.UploadedBy, out var uploaderId) ? uploaderId : null
+            };
+
+            var docId = await _mediator.Send(command);
+            var docs = await _mediator.Send(new GetDocumentsByEmployeeQuery(employeeId));
+            var doc = docs.FirstOrDefault(d => d.Id == docId);
+            return doc != null ? MapDocumentToProto(doc) : new DocumentResponse();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding document for employee {EmployeeId}", request.EmployeeId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while adding the document."));
+        }
+    }
+
+    public override async Task<DeleteDocumentResponse> DeleteDocument(DeleteDocumentRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.DocumentId, out var documentId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid document ID."));
+
+            var command = new DeleteDocumentCommand { DocumentId = documentId };
+            var success = await _mediator.Send(command);
+            return new DeleteDocumentResponse
+            {
+                Success = success,
+                Message = success ? "Document deleted." : "Document not found."
+            };
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting document {DocumentId}", request.DocumentId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while deleting the document."));
+        }
+    }
+
+    // ===== Emergency Contacts =====
+
+    public override async Task<ContactsResponse> GetContacts(GetContactsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID."));
+
+            var contacts = await _mediator.Send(new GetContactsByEmployeeQuery(employeeId));
+            var response = new ContactsResponse();
+            response.Contacts.AddRange(contacts.Select(MapContactToProto));
+            return response;
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting contacts for employee {EmployeeId}", request.EmployeeId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving contacts."));
+        }
+    }
+
+    public override async Task<ContactResponse> AddContact(AddContactRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID."));
+
+            var command = new AddContactCommand
+            {
+                EmployeeId = employeeId,
+                ContactName = request.ContactName,
+                Relationship = request.Relationship,
+                Phone = request.Phone,
+                Email = string.IsNullOrEmpty(request.Email) ? null : request.Email,
+                Address = string.IsNullOrEmpty(request.Address) ? null : request.Address,
+                IsPrimary = request.IsPrimary
+            };
+
+            var contactId = await _mediator.Send(command);
+            var contacts = await _mediator.Send(new GetContactsByEmployeeQuery(employeeId));
+            var contact = contacts.FirstOrDefault(c => c.Id == contactId);
+            return contact != null ? MapContactToProto(contact) : new ContactResponse();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding contact for employee {EmployeeId}", request.EmployeeId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while adding the contact."));
+        }
+    }
+
+    public override async Task<ContactResponse> UpdateContact(UpdateContactRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.ContactId, out var contactId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid contact ID."));
+
+            if (!Guid.TryParse(request.EmployeeId, out var employeeId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid employee ID."));
+
+            var command = new UpdateContactCommand
+            {
+                ContactId = contactId,
+                EmployeeId = employeeId,
+                ContactName = request.ContactName,
+                Relationship = request.Relationship,
+                Phone = request.Phone,
+                Email = string.IsNullOrEmpty(request.Email) ? null : request.Email,
+                Address = string.IsNullOrEmpty(request.Address) ? null : request.Address,
+                IsPrimary = request.IsPrimary
+            };
+
+            var success = await _mediator.Send(command);
+            if (!success)
+                return new ContactResponse();
+
+            var contacts = await _mediator.Send(new GetContactsByEmployeeQuery(employeeId));
+            var contact = contacts.FirstOrDefault(c => c.Id == contactId);
+            return contact != null ? MapContactToProto(contact) : new ContactResponse();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating contact {ContactId}", request.ContactId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while updating the contact."));
+        }
+    }
+
+    public override async Task<DeleteContactResponse> DeleteContact(DeleteContactRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.ContactId, out var contactId))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid contact ID."));
+
+            var command = new DeleteContactCommand { ContactId = contactId };
+            var success = await _mediator.Send(command);
+            return new DeleteContactResponse
+            {
+                Success = success,
+                Message = success ? "Contact deleted." : "Contact not found."
+            };
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting contact {ContactId}", request.ContactId);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while deleting the contact."));
+        }
+    }
+
+    // ===== Announcements =====
+
+    public override async Task<AnnouncementsResponse> GetAnnouncements(GetAnnouncementsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var query = new GetAnnouncementsQuery
+            {
+                Category = string.IsNullOrEmpty(request.Category) ? null : request.Category,
+                DepartmentId = Guid.TryParse(request.DepartmentId, out var deptId) ? deptId : null,
+                IncludeExpired = request.IncludeExpired,
+                Page = request.Page > 0 ? request.Page : 1,
+                PageSize = request.PageSize > 0 ? request.PageSize : 20
+            };
+
+            var announcements = await _mediator.Send(query);
+            var list = announcements.ToList();
+
+            var response = new AnnouncementsResponse { TotalCount = list.Count };
+            response.Announcements.AddRange(list.Select(MapAnnouncementToProto));
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting announcements");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving announcements."));
+        }
+    }
+
+    public override async Task<AnnouncementResponse> GetAnnouncement(GetAnnouncementRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.Id, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid announcement ID."));
+
+            var announcement = await _mediator.Send(new GetAnnouncementByIdQuery(id));
+            if (announcement == null)
+                return new AnnouncementResponse();
+
+            return MapAnnouncementToProto(announcement);
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting announcement {Id}", request.Id);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the announcement."));
+        }
+    }
+
+    public override async Task<AnnouncementResponse> CreateAnnouncement(CreateAnnouncementRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.CreatedBy, out var createdBy))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid creator ID."));
+
+            var command = new CreateAnnouncementCommand
+            {
+                Title = request.Title,
+                Content = request.Content,
+                Category = string.IsNullOrEmpty(request.Category) ? "General" : request.Category,
+                IsPinned = request.IsPinned,
+                ExpiresAt = string.IsNullOrEmpty(request.ExpiresAt) ? null : DateTime.Parse(request.ExpiresAt),
+                DepartmentId = Guid.TryParse(request.DepartmentId, out var deptId) ? deptId : null,
+                CreatedBy = createdBy
+            };
+
+            var announcementId = await _mediator.Send(command);
+            var announcement = await _mediator.Send(new GetAnnouncementByIdQuery(announcementId));
+            return announcement != null ? MapAnnouncementToProto(announcement) : new AnnouncementResponse();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating announcement");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while creating the announcement."));
+        }
+    }
+
+    public override async Task<AnnouncementResponse> UpdateAnnouncement(UpdateAnnouncementRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.Id, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid announcement ID."));
+
+            var command = new UpdateAnnouncementCommand
+            {
+                Id = id,
+                Title = request.Title,
+                Content = request.Content,
+                Category = request.Category,
+                IsPinned = request.IsPinned,
+                ExpiresAt = string.IsNullOrEmpty(request.ExpiresAt) ? null : DateTime.Parse(request.ExpiresAt),
+                DepartmentId = Guid.TryParse(request.DepartmentId, out var deptId) ? deptId : null
+            };
+
+            var success = await _mediator.Send(command);
+            if (!success)
+                return new AnnouncementResponse();
+
+            var announcement = await _mediator.Send(new GetAnnouncementByIdQuery(id));
+            return announcement != null ? MapAnnouncementToProto(announcement) : new AnnouncementResponse();
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating announcement {Id}", request.Id);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while updating the announcement."));
+        }
+    }
+
+    public override async Task<DeleteAnnouncementResponse> DeleteAnnouncement(DeleteAnnouncementRequest request, ServerCallContext context)
+    {
+        try
+        {
+            if (!Guid.TryParse(request.Id, out var id))
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid announcement ID."));
+
+            var command = new DeleteAnnouncementCommand { Id = id };
+            var success = await _mediator.Send(command);
+            return new DeleteAnnouncementResponse
+            {
+                Success = success,
+                Message = success ? "Announcement deleted." : "Announcement not found."
+            };
+        }
+        catch (RpcException) { throw; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting announcement {Id}", request.Id);
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while deleting the announcement."));
+        }
+    }
+
+    // ===== Mapping helpers =====
+
     private Protos.Department MapDepartmentToProto(DepartmentDto dept)
     {
         return new Protos.Department
@@ -514,6 +841,55 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
         };
     }
 
+    private DocumentResponse MapDocumentToProto(DocumentDto doc)
+    {
+        return new DocumentResponse
+        {
+            Id = doc.Id.ToString(),
+            EmployeeId = doc.EmployeeId.ToString(),
+            DocumentType = doc.DocumentType,
+            DocumentName = doc.DocumentName,
+            FilePath = doc.FilePath,
+            Description = doc.Description ?? string.Empty,
+            UploadedAt = doc.UploadedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            UploadedBy = doc.UploadedBy?.ToString() ?? string.Empty
+        };
+    }
+
+    private ContactResponse MapContactToProto(ContactDto contact)
+    {
+        return new ContactResponse
+        {
+            Id = contact.Id.ToString(),
+            EmployeeId = contact.EmployeeId.ToString(),
+            ContactName = contact.ContactName,
+            Relationship = contact.Relationship,
+            Phone = contact.Phone,
+            Email = contact.Email ?? string.Empty,
+            Address = contact.Address ?? string.Empty,
+            IsPrimary = contact.IsPrimary
+        };
+    }
+
+    private AnnouncementResponse MapAnnouncementToProto(AnnouncementDto a)
+    {
+        return new AnnouncementResponse
+        {
+            Id = a.Id.ToString(),
+            Title = a.Title,
+            Content = a.Content,
+            Category = a.Category,
+            IsPinned = a.IsPinned,
+            ExpiresAt = a.ExpiresAt?.ToString("yyyy-MM-ddTHH:mm:ss") ?? string.Empty,
+            DepartmentId = a.DepartmentId?.ToString() ?? string.Empty,
+            DepartmentName = a.DepartmentName ?? string.Empty,
+            CreatedBy = a.CreatedBy.ToString(),
+            CreatedByName = a.CreatedByName ?? string.Empty,
+            CreatedAt = a.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            UpdatedAt = a.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+        };
+    }
+
     private EmployeeResponse MapToResponse(EmployeeDto employee)
     {
         return new EmployeeResponse
@@ -528,7 +904,11 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
             DepartmentId = employee.DepartmentId?.ToString() ?? string.Empty,
             TeamId = employee.TeamId?.ToString() ?? string.Empty,
             ManagerId = employee.ManagerId?.ToString() ?? string.Empty,
-            HireDate = employee.HireDate?.ToString("yyyy-MM-dd") ?? string.Empty
+            HireDate = employee.HireDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            CreatedAt = employee.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            UpdatedAt = employee.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+            BaseSalary = employee.BaseSalary?.ToString("F2") ?? string.Empty,
+            EmployeeCode = employee.EmployeeCode ?? string.Empty
         };
     }
 }

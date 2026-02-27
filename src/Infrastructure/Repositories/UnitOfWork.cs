@@ -12,6 +12,9 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<Department>? _departmentRepository;
     private IRepository<Team>? _teamRepository;
     private IRepository<EmployeeRole>? _employeeRoleRepository;
+    private IRepository<EmployeeDocument>? _documentRepository;
+    private IRepository<EmployeeContact>? _contactRepository;
+    private IRepository<Announcement>? _announcementRepository;
 
     public UnitOfWork(EmployeeDbContext context)
     {
@@ -32,6 +35,15 @@ public class UnitOfWork : IUnitOfWork
 
     public IRepository<EmployeeRole> EmployeeRoles =>
         _employeeRoleRepository ??= new Repository<EmployeeRole>(_context);
+
+    public IRepository<EmployeeDocument> Documents =>
+        _documentRepository ??= new Repository<EmployeeDocument>(_context);
+
+    public IRepository<EmployeeContact> Contacts =>
+        _contactRepository ??= new Repository<EmployeeContact>(_context);
+
+    public IRepository<Announcement> Announcements =>
+        _announcementRepository ??= new Repository<Announcement>(_context);
 
     public async Task<int> SaveChangesAsync()
     {
