@@ -20,6 +20,14 @@ public class EmployeeDbContext : DbContext
     public DbSet<EmployeeDocument> EmployeeDocuments => Set<EmployeeDocument>();
     public DbSet<EmployeeContact> EmployeeContacts => Set<EmployeeContact>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
+    
+    // New entities for modern HR management
+    public DbSet<EmployeeSkill> EmployeeSkills => Set<EmployeeSkill>();
+    public DbSet<EmployeePerformanceReview> EmployeePerformanceReviews => Set<EmployeePerformanceReview>();
+    public DbSet<EmployeeSalaryHistory> EmployeeSalaryHistory => Set<EmployeeSalaryHistory>();
+    public DbSet<EmployeeOnboarding> EmployeeOnboardings => Set<EmployeeOnboarding>();
+    public DbSet<EmployeeCertification> EmployeeCertifications => Set<EmployeeCertification>();
+    public DbSet<EmployeeGoal> EmployeeGoals => Set<EmployeeGoal>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -165,6 +173,89 @@ public class EmployeeDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.CreatedBy)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // EmployeeSkill
+        modelBuilder.Entity<EmployeeSkill>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.SkillName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => new { e.EmployeeId, e.Category });
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeePerformanceReview
+        modelBuilder.Entity<EmployeePerformanceReview>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ReviewType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => new { e.EmployeeId, e.ReviewDate });
+            entity.HasIndex(e => e.Status);
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeSalaryHistory
+        modelBuilder.Entity<EmployeeSalaryHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ChangeReason).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.PreviousSalary).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.NewSalary).HasColumnType("decimal(18,2)");
+            entity.HasIndex(e => new { e.EmployeeId, e.EffectiveDate });
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeOnboarding
+        modelBuilder.Entity<EmployeeOnboarding>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => new { e.EmployeeId, e.Status });
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeCertification
+        modelBuilder.Entity<EmployeeCertification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CertificationName).IsRequired().HasMaxLength(300);
+            entity.Property(e => e.IssuingOrganization).IsRequired().HasMaxLength(300);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => new { e.EmployeeId, e.ExpiryDate });
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // EmployeeGoal
+        modelBuilder.Entity<EmployeeGoal>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(300);
+            entity.Property(e => e.GoalType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Priority).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => new { e.EmployeeId, e.Status });
+            entity.HasOne(e => e.Employee)
+                .WithMany()
+                .HasForeignKey(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Seed data

@@ -3,7 +3,7 @@ using MediatR;
 
 namespace EmployeeService.Application.Features.Employees.Queries;
 
-public class GetAnnouncementsQuery : IRequest<IEnumerable<AnnouncementDto>>
+public class GetAnnouncementsQuery : IRequest<PaginatedAnnouncementsDto>
 {
     public string? Category { get; set; }
     public Guid? DepartmentId { get; set; }

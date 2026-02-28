@@ -690,11 +690,10 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
                 PageSize = request.PageSize > 0 ? request.PageSize : 20
             };
 
-            var announcements = await _mediator.Send(query);
-            var list = announcements.ToList();
+            var result = await _mediator.Send(query);
 
-            var response = new AnnouncementsResponse { TotalCount = list.Count };
-            response.Announcements.AddRange(list.Select(MapAnnouncementToProto));
+            var response = new AnnouncementsResponse { TotalCount = result.TotalCount };
+            response.Announcements.AddRange(result.Items.Select(MapAnnouncementToProto));
             return response;
         }
         catch (Exception ex)
@@ -910,5 +909,78 @@ public class EmployeeGrpcServiceImpl : EmployeeGrpc.EmployeeGrpcBase
             BaseSalary = employee.BaseSalary?.ToString("F2") ?? string.Empty,
             EmployeeCode = employee.EmployeeCode ?? string.Empty
         };
+    }
+
+    // ===== Organization Chart =====
+
+    public override async Task<OrgChartResponse> GetOrgChart(GetOrgChartRequest request, ServerCallContext context)
+    {
+        try
+        {
+            // Get all organizational data
+            var departments = (await _mediator.Send(new GetAllDepartmentsQuery())).ToList();
+            var teams = (await _mediator.Send(new GetAllTeamsQuery())).ToList();
+            var employees = (await _mediator.Send(new GetAllEmployeesQuery())).ToList();
+
+            // Build the organization tree
+            var rootNode = new OrgChartNode
+            {
+                Id = "company-root",
+                Name = "Organization",
+                Type = "company",
+                ParentId = ""
+            };
+
+            // Add departments as children of root
+            foreach (var dept in departments)
+            {
+                var deptNode = new OrgChartNode
+                {
+                    Id = dept.Id.ToString(),
+                    Name = dept.Name,
+                    Type = "department",
+                    ParentId = "company-root"
+                };
+
+                // Add teams under this department
+                var deptTeams = teams.Where(t => t.DepartmentId == dept.Id).ToList();
+                foreach (var team in deptTeams)
+                {
+                    var teamNode = new OrgChartNode
+                    {
+                        Id = team.Id.ToString(),
+                        Name = team.Name,
+                        Type = "team",
+                        ParentId = dept.Id.ToString()
+                    };
+
+                    // Add employees under this team
+                    var teamEmployees = employees.Where(e => e.TeamId == team.Id).ToList();
+                    foreach (var emp in teamEmployees)
+                    {
+                        var empNode = new OrgChartNode
+                        {
+                            Id = $"emp-{emp.Id}",
+                            Name = $"{emp.FirstName} {emp.LastName}",
+                            Type = "employee",
+                            ParentId = team.Id.ToString(),
+                            EmployeeData = MapToResponse(emp)
+                        };
+                        teamNode.Children.Add(empNode);
+                    }
+
+                    deptNode.Children.Add(teamNode);
+                }
+
+                rootNode.Children.Add(deptNode);
+            }
+
+            return new OrgChartResponse { Root = rootNode };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting organization chart");
+            throw new RpcException(new Status(StatusCode.Internal, "An error occurred while retrieving the organization chart."));
+        }
     }
 }

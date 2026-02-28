@@ -4,7 +4,7 @@ using MediatR;
 
 namespace EmployeeService.Application.Features.Employees.Queries;
 
-public class GetAnnouncementsQueryHandler : IRequestHandler<GetAnnouncementsQuery, IEnumerable<AnnouncementDto>>
+public class GetAnnouncementsQueryHandler : IRequestHandler<GetAnnouncementsQuery, PaginatedAnnouncementsDto>
 {
     private readonly IUnitOfWork _unitOfWork;
 
@@ -13,7 +13,7 @@ public class GetAnnouncementsQueryHandler : IRequestHandler<GetAnnouncementsQuer
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<IEnumerable<AnnouncementDto>> Handle(GetAnnouncementsQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedAnnouncementsDto> Handle(GetAnnouncementsQuery request, CancellationToken cancellationToken)
     {
         var all = await _unitOfWork.Announcements.GetAllAsync();
         var employees = await _unitOfWork.Employees.GetAllAsync();
@@ -30,9 +30,13 @@ public class GetAnnouncementsQueryHandler : IRequestHandler<GetAnnouncementsQuer
         if (request.DepartmentId.HasValue)
             query = query.Where(a => a.DepartmentId == null || a.DepartmentId == request.DepartmentId);
 
-        return query
+        var totalCount = query.Count();
+
+        var announcements = query
             .OrderByDescending(a => a.IsPinned)
             .ThenByDescending(a => a.CreatedAt)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
             .Select(a =>
             {
                 var creator = employees.FirstOrDefault(e => e.Id == a.CreatedBy);
@@ -53,5 +57,13 @@ public class GetAnnouncementsQueryHandler : IRequestHandler<GetAnnouncementsQuer
                     UpdatedAt = a.UpdatedAt
                 };
             });
+
+        return new PaginatedAnnouncementsDto
+        {
+            Items = announcements,
+            TotalCount = totalCount,
+            Page = request.Page,
+            PageSize = request.PageSize
+        };
     }
 }
